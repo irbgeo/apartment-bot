@@ -1,0 +1,11 @@
+*secret*
+*_old
+client-test/
+mocks/
+
+*.pb.go
+
+*__debug_*
+
+.env.*
+*-test/

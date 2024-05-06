@@ -1,0 +1,59 @@
+version: '3.7'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: apartment
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo:/data/db
+
+  server:
+    image: irbgeo/server:${SERVER_VERSION}
+    container_name: server
+    ports:
+      - "9000:9000"
+    environment:
+      MONGO_URL: ${MONGO_URL}
+      AUTH_TOKEN: ${AUTH_TOKEN}
+      MY_HOME_MAX_PAGE: 30
+    depends_on:
+      - mongodb
+    healthcheck:
+      test: ["CMD-SHELL", "grpc_health_probe -addr=:9005 -service=server"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+    restart: always
+
+  message:
+    image: irbgeo/message:${MESSAGE_VERSION}
+    container_name: message
+    ports:
+      - "9001:9001"
+    environment:
+      MONGO_URL: ${MONGO_URL}
+      AUTH_TOKEN: ${AUTH_TOKEN}
+    restart: always
+
+  client:
+    image: irbgeo/client:${CLIENT_VERSION}
+    container_name: client
+    environment:
+      SERVER_URL: server:9000
+      MESSAGE_URL: message:9001
+      TELEGRAM_BOT_SECRET: ${TELEGRAM_BOT_SECRET}
+      AUTH_TOKEN: ${AUTH_TOKEN}
+      TELEGRAM_BOT_DISABLED_PARAMS: ""
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  mongo:
+

@@ -1,0 +1,17 @@
+FROM golang:1.21-alpine AS build
+
+WORKDIR /go/src/apartment-bot
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+COPY . .
+
+RUN go install ./cmd/message/...
+
+FROM alpine:latest
+
+COPY --from=build /go/bin/message /usr/local/bin/run_app
+
+CMD [ "run_app" ]

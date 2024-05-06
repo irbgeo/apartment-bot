@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = ".;api";
+
+service MessageServer {
+  rpc Publish(Message) returns (google.protobuf.Empty) {}
+  rpc Watch(google.protobuf.Empty) returns (stream Message) {}
+}
+  
+
+message Message {
+  string text = 1;
+  int64 user_id = 2;
+}
+  

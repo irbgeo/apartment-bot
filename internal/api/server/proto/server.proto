@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = ".;api";
+
+service Server {
+  rpc Connect(google.protobuf.Empty) returns (stream Apartment) {}
+  rpc SaveFilter(Filter) returns (SaveFilterResult) {}
+  rpc FilterInfo(Filter) returns (Filter) {}
+  rpc Filters(FilterListReq) returns (FilterListRes) {}
+  rpc DeleteFilter(Filter) returns (google.protobuf.Empty) {}
+  rpc ConnectUser(User) returns (google.protobuf.Empty) {}
+  rpc DisconnectUser(User) returns (google.protobuf.Empty) {}
+  rpc Cities(google.protobuf.Empty) returns (City) {}
+  rpc Apartments(Filter) returns (stream Apartment) {}
+}
+
+message SaveFilterResult {
+  int64 count = 1;
+}
+
+message FilterListReq {
+  int64 user_id = 1;
+}
+
+message FilterListRes {
+  repeated Filter filters = 1;
+}
+
+message Apartment {
+  int64 id = 1;
+  int64 ad_type = 2; 
+  int64 building_status = 3;
+  double price = 4; // Updated field number
+  double rooms = 5; // Updated field number
+  int64 bedrooms = 6;
+  int64 floor = 7;
+  double area = 8; // Updated field number
+  string phone = 9;
+  string district = 10;
+  string city = 11;
+  optional Coordinates coordinates = 12;
+  bool is_owner = 13;
+  string comment = 14; // Updated field number
+  string order_date = 15;
+  string url = 16;
+  repeated string photo_urls = 17;
+
+  repeated ApartmentFilter filters = 18; // Updated field number
+}
+
+message Coordinates {
+  double lat = 1;
+  double lng = 2;
+}
+
+message ApartmentFilter {
+  int64 user_id = 1;
+  repeated string filter_names = 2;
+}
+
+message Filter {
+  string id = 1;
+  int64 user_id = 2;
+  optional string name = 3;
+  optional int64 ad_type = 4;
+  optional int64 building_status = 5;
+  optional string city = 6; // Updated field number
+  repeated string districts = 7; // Updated field number
+  optional double min_price = 8; // Updated field number
+  optional double max_price = 9; // Updated field number
+  optional double min_rooms = 10; // Updated field number
+  optional double max_rooms = 11; // Updated field number
+  optional double min_area = 12; // Updated field number
+  optional double max_area = 13; // Updated field number
+  optional Coordinates location_coordinates = 14; // Updated field number
+  optional double max_distance = 15; // Updated field number
+  optional bool is_owner = 16; // Updated field number
+  optional int64 pause_timestamp = 17; // Updated field number
+}
+
+message User {
+  int64 id = 1;
+}
+
+message City {
+  map<string, District> name = 1;
+}
+
+message District{
+  repeated string names = 1;
+}

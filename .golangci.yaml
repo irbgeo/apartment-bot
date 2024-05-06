@@ -1,0 +1,55 @@
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+  govet:
+    check-shadowing: false
+  revive:
+    rules:
+      - name: unexported-return
+        disabled: true
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+  goimports:
+    local-prefixes: github.com/irbgeo/apartment-bot
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - dogsled
+    - errcheck
+    - exportloopref
+    - exhaustive
+    - goconst
+    - gofmt
+    - goimports
+    - gocyclo
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - prealloc
+    - predeclared
+    - revive
+    - staticcheck
+    - stylecheck
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - whitespace
+
+issues:
+  exclude-dirs:
+    - api
+    - deploy
+
+run:
+  issues-exit-code: 1
