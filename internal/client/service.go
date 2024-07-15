@@ -45,7 +45,7 @@ type srv interface {
 	DisconnectUser(context.Context, server.User) error
 	Cities(ctx context.Context) (map[string][]string, error)
 	Apartments(ctx context.Context, f server.Filter) (<-chan server.Apartment, <-chan error, error)
-	StartApartmentWatcher(context.Context) (<-chan server.Apartment, <-chan error, error)
+	Connect(context.Context) (<-chan server.Apartment, <-chan error, error)
 }
 
 func NewService(srv srv, firstCities []string) (*service, error) {
@@ -69,7 +69,7 @@ func NewService(srv srv, firstCities []string) (*service, error) {
 }
 
 func (s *service) Start() error {
-	apartmentCh, errCh, err := s.srv.StartApartmentWatcher(s.ctx)
+	apartmentCh, errCh, err := s.srv.Connect(s.ctx)
 	if err != nil {
 		return err
 	}

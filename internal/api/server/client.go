@@ -19,9 +19,6 @@ import (
 
 type client struct {
 	cli api.ServerClient
-
-	apartmentCh chan server.Apartment
-	errCh       chan error
 }
 
 func NewClient(
@@ -42,12 +39,24 @@ func NewClient(
 
 	cli := &client{
 		cli: api.NewServerClient(conn),
-
-		apartmentCh: make(chan server.Apartment),
-		errCh:       make(chan error),
 	}
 
 	return cli, nil
+}
+
+func (s *client) Connect(ctx context.Context) (<-chan server.Apartment, <-chan error, error) {
+	stream, err := s.cli.Connect(ctx, &emptypb.Empty{})
+	if err != nil {
+		err = fmt.Errorf(status.Convert(err).Message())
+		return nil, nil, err
+	}
+
+	apartmentCh := make(chan server.Apartment)
+	errCh := make(chan error)
+
+	go s.apartmentPipeline(ctx, stream.CloseSend, apartmentCh, errCh, stream.Recv)
+
+	return apartmentCh, errCh, nil
 }
 
 func (s *client) SaveFilter(ctx context.Context, filter server.Filter) (int64, error) {
@@ -149,18 +158,6 @@ func (s *client) Apartments(ctx context.Context, f server.Filter) (<-chan server
 	go s.apartmentPipeline(ctx, stream.CloseSend, apartmentCh, errCh, stream.Recv)
 
 	return apartmentCh, errCh, nil
-}
-
-func (s *client) StartApartmentWatcher(ctx context.Context) (<-chan server.Apartment, <-chan error, error) {
-	stream, err := s.cli.Connect(ctx, &emptypb.Empty{})
-	if err != nil {
-		err = fmt.Errorf(status.Convert(err).Message())
-		return nil, nil, err
-	}
-
-	go s.apartmentPipeline(ctx, stream.CloseSend, s.apartmentCh, s.errCh, stream.Recv)
-
-	return s.apartmentCh, s.errCh, nil
 }
 
 func (s *client) apartmentPipeline(ctx context.Context, closePipeline func() error, apartmentCh chan server.Apartment, errCh chan error, receiveApartment func() (*api.Apartment, error)) {
