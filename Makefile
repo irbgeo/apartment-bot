@@ -1,6 +1,9 @@
 
 include .env .env.secret
 
+SERVER_NAME=apartment-bot-server
+CLIENT_NAME=apartment-bot-client
+
 env:
 	$(.env)
 	$(.env.secret)
@@ -31,9 +34,8 @@ build-and-push-service:
 	docker push irbgeo/$(SERVICE):$(VERSION)
 
 build-and-push-all: env
-	$(MAKE) build-and-push-service SERVICE="server" VERSION=$(SERVER_VERSION)
-	$(MAKE) build-and-push-service SERVICE="client" VERSION=$(CLIENT_VERSION)
-	$(MAKE) build-and-push-service SERVICE="message" VERSION=$(MESSAGE_VERSION)
+	$(MAKE) build-and-push-service SERVICE=$(SERVER_NAME) VERSION=$(SERVER_VERSION)
+	$(MAKE) build-and-push-service SERVICE=$(CLIENT_NAME) VERSION=$(CLIENT_VERSION)
 
 run-test: env 
 	docker compose -f ./docker-compose.test.yaml up -d --build
