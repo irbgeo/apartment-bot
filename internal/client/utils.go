@@ -26,13 +26,13 @@ func WithActiveFilter[REQ req](ctx context.Context, r REQ, handler func(context.
 
 // StopReceiveHistoryFilter stops receiving history for a specific filter.
 func (s *service) StopReceiveHistoryFilter(filterID string) {
-	cancel, ok := s.historyReceiving.Load(filterID)
+	cancel, ok := s.storage.historyReceiving.Load(filterID)
 	if !ok {
 		return
 	}
 
-	cancel.(context.CancelFunc)()
-	s.historyReceiving.Delete(filterID)
+	cancel.(context.CancelFunc)() // nolint: errcheck
+	s.storage.historyReceiving.Delete(filterID)
 }
 
 // checkFilter checks if the provided filter is valid.

@@ -3,11 +3,8 @@ package client
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"time"
-
-	// TODO: remove this import
 
 	"github.com/irbgeo/apartment-bot/internal/server"
 )
@@ -23,17 +20,11 @@ var (
 )
 
 type service struct {
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	srv                  srv
-	activeFilter         sync.Map
-	turnedOffFilterMutex sync.RWMutex
-	turnedOffFilter      map[int64]map[string]time.Time
-	historyReceiving     sync.Map
-	disconnectedUser     sync.Map
-	apartmentCh          chan server.Apartment
-	firstCities          []string
-	cities               sync.Map
+	ctx      context.Context
+	cancel   context.CancelFunc
+	srv      srv
+	channels channels
+	storage  storage
 }
 
 type srv interface {
@@ -55,16 +46,23 @@ func NewService(srv srv, firstCities []string) (*service, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	svc := &service{
-		ctx:             ctx,
-		cancel:          cancel,
-		srv:             srv,
-		firstCities:     firstCities,
-		apartmentCh:     make(chan server.Apartment),
-		turnedOffFilter: make(map[int64]map[string]time.Time),
+		ctx:    ctx,
+		cancel: cancel,
+		srv:    srv,
+		channels: channels{
+			apartment: make(chan server.Apartment),
+		},
+		storage: storage{
+			turnedOff: turnedOffStorage{
+				filters: make(map[int64]map[string]time.Time),
+			},
+			cities: citiesStorage{
+				firstCities: firstCities,
+			},
+		},
 	}
 
 	activeFilter = svc.ActiveFilter
-
 	return svc, nil
 }
 
@@ -73,19 +71,14 @@ func (s *service) Start() error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		if err := s.receivingFromApartmentChan(s.ctx, apartmentCh, errCh); err != nil {
-			slog.Error("finish_apartment_watcher", "err", err)
-		}
-	}()
 
-	err = s.startUpdatingCity(s.ctx)
-	if err != nil {
+	go s.handleApartments(apartmentCh, errCh) // nolint: errcheck
+
+	if err := s.startUpdatingCity(); err != nil {
 		return err
 	}
 
-	err = s.startCheckTurnedOffFilters(s.ctx)
-	if err != nil {
+	if err := s.startCheckTurnedOffFilters(); err != nil {
 		return err
 	}
 
@@ -94,16 +87,16 @@ func (s *service) Start() error {
 
 func (s *service) Stop() {
 	s.cancel()
-	close(s.apartmentCh)
+	close(s.channels.apartment)
 	atomic.StoreInt64(&onceClientFlag, 0)
 }
 
 func (s *service) Watcher() <-chan server.Apartment {
-	return s.apartmentCh
+	return s.channels.apartment
 }
 
 func (s *service) StartChat(ctx context.Context, u *server.User) error {
-	s.disconnectedUser.Delete(u.ID)
+	s.storage.disconnectedUsers.Delete(u.ID)
 	return s.srv.ConnectUser(ctx, *u)
 }
 
@@ -112,28 +105,26 @@ func (s *service) Filters(ctx context.Context, u *server.User) ([]server.Filter,
 }
 
 func (s *service) ActiveFilter(ctx context.Context, u *server.User) (*server.Filter, error) {
-	f, isExist := s.activeFilter.Load(u.ID)
-	if !isExist {
+	f, exists := s.storage.active.Load(u.ID)
+	if !exists {
 		return nil, ErrFilterNotFound
 	}
-
-	return f.(*server.Filter), nil
+	return f.(*server.Filter), nil // nolint: errcheck
 }
 
 func (s *service) Filter(ctx context.Context, f *server.Filter) (*server.Filter, error) {
-	f, err := s.srv.Filter(ctx, *f)
+	filter, err := s.srv.Filter(ctx, *f)
 	if err != nil {
 		return nil, err
 	}
 
-	s.activeFilter.Store(f.User.ID, f)
-	return f, nil
+	s.storage.active.Store(filter.User.ID, filter)
+	return filter, nil
 }
 
 func (s *service) StartCreatingFilter(ctx context.Context, u *server.User) *server.Filter {
 	defaultAdType := server.RentAdType
-
-	newFilter := &server.Filter{
+	filter := &server.Filter{
 		User: &server.User{
 			ID: u.ID,
 		},
@@ -141,22 +132,21 @@ func (s *service) StartCreatingFilter(ctx context.Context, u *server.User) *serv
 		AdType:   &defaultAdType,
 	}
 
-	s.activeFilter.Store(u.ID, newFilter)
-	return newFilter
+	s.storage.active.Store(u.ID, filter)
+	return filter
 }
 
-func (s *service) CancelCreatingFilter(ctx context.Context, u *server.User) {
-	s.activeFilter.Delete(u.ID)
+func (s *service) CancelCreatingFilter(_ context.Context, u *server.User) {
+	s.storage.active.Delete(u.ID)
 }
 
-func (s *service) SaveFilter(ctx context.Context, i *SaveFilterInfo) (*server.Filter, int64, error) {
-	activeFilter, err := activeFilter(ctx, i.User)
+func (s *service) SaveFilter(ctx context.Context, info *SaveFilterInfo) (*server.Filter, int64, error) {
+	activeFilter, err := activeFilter(ctx, info.User)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	err = checkFilter(activeFilter)
-	if err != nil {
+	if err := checkFilter(activeFilter); err != nil {
 		return nil, 0, err
 	}
 
@@ -167,21 +157,25 @@ func (s *service) SaveFilter(ctx context.Context, i *SaveFilterInfo) (*server.Fi
 		return nil, 0, err
 	}
 
-	if activeFilter.PauseTimestamp != nil {
-		s.turnOffFilter(activeFilter)
-	} else {
-		s.turnOnFilter(activeFilter)
-	}
+	s.handleFilterStatus(activeFilter)
+	s.storage.active.Delete(info.User.ID)
 
-	s.activeFilter.Delete(i.User.ID)
 	return activeFilter, count, nil
+}
+
+func (s *service) handleFilterStatus(f *server.Filter) {
+	if f.PauseTimestamp != nil {
+		s.turnOffFilter(f)
+	} else {
+		s.turnOnFilter(f)
+	}
 }
 
 func (s *service) Apartments(ctx context.Context, f *server.Filter) error {
 	s.StopReceiveHistoryFilter(f.ID)
 
 	aCtx, cancel := context.WithCancel(ctx)
-	s.historyReceiving.Store(f.ID, cancel)
+	s.storage.historyReceiving.Store(f.ID, cancel)
 
 	apartmentCh, errCh, err := s.srv.Apartments(aCtx, *f)
 	if err != nil {
@@ -189,18 +183,12 @@ func (s *service) Apartments(ctx context.Context, f *server.Filter) error {
 		return err
 	}
 
-	err = s.receivingFromApartmentChan(aCtx, apartmentCh, errCh)
-	if err != nil {
-		s.StopReceiveHistoryFilter(f.ID)
-		return err
-	}
-
-	return nil
+	return s.handleApartments(apartmentCh, errCh)
 }
 
 func (s *service) DeleteFilter(ctx context.Context, f *server.Filter) error {
 	if len(f.ID) == 0 {
-		s.activeFilter.Delete(f.User.ID)
+		s.storage.active.Delete(f.User.ID)
 		return nil
 	}
 
@@ -209,86 +197,85 @@ func (s *service) DeleteFilter(ctx context.Context, f *server.Filter) error {
 	if err := s.srv.DeleteFilter(ctx, *f); err != nil {
 		return err
 	}
-	s.turnOffFilter(f)
-	s.activeFilter.Delete(f.User.ID)
 
+	s.turnOffFilter(f)
+	s.storage.active.Delete(f.User.ID)
 	return nil
 }
 
 func (s *service) IsAllow(userID int64) bool {
-	_, isDisconnected := s.disconnectedUser.Load(userID)
-
+	_, isDisconnected := s.storage.disconnectedUsers.Load(userID)
 	return !isDisconnected
 }
 
-func (s *service) WorkingFilters(userID int64, f []string) []string {
-	workingFilters := make([]string, 0, len(f))
-	for _, filterName := range f {
-		name := filterName
-
-		f := &server.Filter{
-			User: &server.User{
-				ID: userID,
-			},
+func (s *service) WorkingFilters(userID int64, filters []string) []string {
+	result := make([]string, 0, len(filters))
+	for _, name := range filters {
+		filter := &server.Filter{
+			User: &server.User{ID: userID},
 			Name: &name,
 		}
-		if !s.isTurnedOff(f) {
-			workingFilters = append(workingFilters, filterName)
+		if !s.isTurnedOff(filter) {
+			result = append(result, name)
 		}
 	}
-	return workingFilters
+	return result
 }
 
 func (s *service) AvailableCities() []string {
-	availableCities := make([]string, 0)
+	cities := make([]string, 0)
+	tempCities := make(map[string]struct{})
 
-	var tmpCities sync.Map
-	s.cities.Range(func(key, value any) bool {
-		tmpCities.Store(key, value)
+	s.storage.cities.Range(func(key, _ interface{}) bool {
+		tempCities[key.(string)] = struct{}{} // nolint: errcheck
 		return true
 	})
 
-	for _, c := range s.firstCities {
-		availableCities = append(availableCities, c)
-		tmpCities.Delete(c)
+	// Add first cities in order
+	for _, city := range s.storage.cities.firstCities {
+		cities = append(cities, city)
+		delete(tempCities, city)
 	}
 
-	tmpCities.Range(func(key, _ any) bool {
-		availableCities = append(availableCities, key.(string))
-		return true
-	})
+	// Add remaining cities
+	for city := range tempCities {
+		cities = append(cities, city)
+	}
 
-	return availableCities
+	return cities
 }
 
 func (s *service) AvailableDistrictsForCity(city string) []string {
-	districts, _ := s.cities.Load(city)
-	return districts.([]string)
+	districts, ok := s.storage.cities.Load(city)
+	if ok {
+		return nil
+	}
+	return districts.([]string) // nolint: errcheck
 }
 
-func (s *service) startUpdatingCity(ctx context.Context) error {
-	err := s.updateCity()
-	if err != nil {
+func (s *service) startUpdatingCity() error {
+	if err := s.updateCity(); err != nil {
 		return err
 	}
 
-	go func() {
-		ticker := time.NewTicker(updateCityInterval)
-		defer ticker.Stop()
+	go s.cityUpdateLoop()
+	return nil
+}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				err := s.updateCity()
-				if err != nil {
-					slog.Error("update_city", "err", err)
-				}
+func (s *service) cityUpdateLoop() {
+	ticker := time.NewTicker(updateCityInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			if err := s.updateCity(); err != nil {
+				slog.Error("update city failed", "error", err)
 			}
 		}
-	}()
-	return nil
+	}
 }
 
 func (s *service) updateCity() error {
@@ -298,100 +285,104 @@ func (s *service) updateCity() error {
 	}
 
 	for name, districts := range cities {
-		s.cities.Store(name, districts)
+		s.storage.cities.Store(name, districts)
 	}
 	return nil
 }
 
-func (s *service) startCheckTurnedOffFilters(ctx context.Context) error {
-	go func() {
-		ticker := time.NewTicker(checkTurnedOffFilterInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.checkTurnedOffFilters()
-			}
-		}
-	}()
+func (s *service) startCheckTurnedOffFilters() error {
+	go s.checkTurnedOffFiltersLoop()
 	return nil
 }
 
+func (s *service) checkTurnedOffFiltersLoop() {
+	ticker := time.NewTicker(checkTurnedOffFilterInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			s.checkTurnedOffFilters()
+		}
+	}
+}
+
 func (s *service) checkTurnedOffFilters() {
-	s.turnedOffFilterMutex.RLock()
-	defer s.turnedOffFilterMutex.RUnlock()
+	s.storage.turnedOff.RLock()
+	defer s.storage.turnedOff.RUnlock()
 
-	for userID, filters := range s.turnedOffFilter {
+	now := time.Now()
+	for userID, filters := range s.storage.turnedOff.filters {
 		for filterID, t := range filters {
-			if time.Since(t) > turnedOffFilterTime {
-				delete(s.turnedOffFilter[userID], filterID)
+			if now.Sub(t) > turnedOffFilterTime {
+				delete(s.storage.turnedOff.filters[userID], filterID)
 			}
-
-			if len(s.turnedOffFilter[userID]) == 0 {
-				delete(s.turnedOffFilter, userID)
-			}
+		}
+		if len(s.storage.turnedOff.filters[userID]) == 0 {
+			delete(s.storage.turnedOff.filters, userID)
 		}
 	}
 }
 
 func (s *service) turnOffFilter(f *server.Filter) {
-	s.turnedOffFilterMutex.Lock()
-	defer s.turnedOffFilterMutex.Unlock()
+	s.storage.turnedOff.Lock()
+	defer s.storage.turnedOff.Unlock()
 
-	if _, ok := s.turnedOffFilter[f.User.ID]; !ok {
-		s.turnedOffFilter[f.User.ID] = make(map[string]time.Time)
+	if _, exists := s.storage.turnedOff.filters[f.User.ID]; !exists {
+		s.storage.turnedOff.filters[f.User.ID] = make(map[string]time.Time)
 	}
-
-	s.turnedOffFilter[f.User.ID][f.ID] = time.Now()
+	s.storage.turnedOff.filters[f.User.ID][f.ID] = time.Now()
 }
 
 func (s *service) turnOnFilter(f *server.Filter) {
-	s.turnedOffFilterMutex.Lock()
-	defer s.turnedOffFilterMutex.Unlock()
+	s.storage.turnedOff.Lock()
+	defer s.storage.turnedOff.Unlock()
 
-	if _, ok := s.turnedOffFilter[f.User.ID]; !ok {
-		return
+	if filters, exists := s.storage.turnedOff.filters[f.User.ID]; exists {
+		delete(filters, f.ID)
+		if len(filters) == 0 {
+			delete(s.storage.turnedOff.filters, f.User.ID)
+		}
 	}
-
-	delete(s.turnedOffFilter[f.User.ID], f.ID)
 }
 
 func (s *service) isTurnedOff(f *server.Filter) bool {
-	s.turnedOffFilterMutex.RLock()
-	defer s.turnedOffFilterMutex.RUnlock()
+	s.storage.turnedOff.RLock()
+	defer s.storage.turnedOff.RUnlock()
 
-	if _, ok := s.turnedOffFilter[f.User.ID]; !ok {
+	filters, exists := s.storage.turnedOff.filters[f.User.ID]
+	if !exists {
 		return false
 	}
 
-	_, isTurnedOff := s.turnedOffFilter[f.User.ID][f.ID]
-	if isTurnedOff {
-		s.turnedOffFilter[f.User.ID][f.ID] = time.Now()
+	if _, isTurnedOff := filters[f.ID]; isTurnedOff {
+		filters[f.ID] = time.Now()
+		return true
 	}
-
-	return isTurnedOff
+	return false
 }
 
-func (s *service) receivingFromApartmentChan(ctx context.Context, apartmentCh <-chan server.Apartment, errCh <-chan error) error {
+func (s *service) handleApartments(apartmentCh <-chan server.Apartment, errCh <-chan error) error {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-s.ctx.Done():
 			return nil
-		case err, isOpen := <-errCh:
-			if !isOpen {
+		case err, ok := <-errCh:
+			if !ok {
 				return nil
 			}
 			return err
-		case a, isOpen := <-apartmentCh:
-			if !isOpen {
+		case apt, ok := <-apartmentCh:
+			if !ok {
 				return nil
 			}
-
-			slog.Info("receive_apartment", "id", a.ID, "server.User", a.Filter)
-			s.apartmentCh <- a
+			slog.Info("received apartment",
+				"id", apt.ID,
+				"filter", apt.Filter,
+			)
+			s.channels.apartment <- apt
 		}
 	}
 }

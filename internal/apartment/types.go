@@ -2,6 +2,8 @@ package apartment
 
 import "time"
 
-type StartOpts struct {
-	UpdateInterval time.Duration
+// Config contains configuration for creating a new service
+type Config struct {
+	MaxFetchPages int64
+	ApartmentTTL  time.Duration
 }

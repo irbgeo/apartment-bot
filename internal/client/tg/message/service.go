@@ -31,7 +31,7 @@ func (s *service) getUserStack(userID int64) *stack {
 		}
 		s.userStacks.Store(userID, st)
 	}
-	return st.(*stack)
+	return st.(*stack) // nolint: errcheck
 }
 
 // StoreMessage saves a message in the user's stack.

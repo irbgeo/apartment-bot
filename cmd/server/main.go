@@ -57,9 +57,13 @@ func main() {
 
 	ssProvider := ssge.NewSSGEProvider()
 
+	apartmentCfg := apartment.Config{
+		MaxFetchPages: cfg.MaxFetchPages,
+		ApartmentTTL:  time.Duration(cfg.ApartmentDayToLive) * 24 * time.Hour,
+	}
+
 	apartmentSvc := apartment.NewService(
-		cfg.MaxFetchPages,
-		time.Duration(cfg.ApartmentDayToLive)*24*time.Hour,
+		apartmentCfg,
 		ssProvider,
 	)
 
@@ -70,7 +74,7 @@ func main() {
 	)
 
 	// start provider service for refreshing access token
-	if err := ssProvider.Start(ssge.StartOpts{RefreshTokenInterval: 10 * time.Minute}); err != nil {
+	if err := ssProvider.Start(cfg.RefreshTokenInterval); err != nil {
 		slog.Error("start ssge provider", "err", err)
 		os.Exit(1)
 	}
@@ -102,8 +106,8 @@ func main() {
 	slog.Info("apartments in cache", "cnt", cnt)
 
 	// start apartment service
-	if err := apartmentSvc.Start(apartment.StartOpts{UpdateInterval: cfg.ApartmentUpdateInterval}); err != nil {
-		slog.Error("start ss.ge provider", "err", err)
+	if err := apartmentSvc.Start(cfg.ApartmentUpdateInterval); err != nil {
+		slog.Error("start apartment service", "err", err)
 		os.Exit(1)
 	}
 

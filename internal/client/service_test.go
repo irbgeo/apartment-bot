@@ -30,7 +30,7 @@ func TestAvailableCities(t *testing.T) {
 	allCities := []string{"City1", "City2", "City3", "City4", "City5", "City6", "City7", "City8", "City9", "City10"}
 
 	for _, city := range allCities {
-		s.cities.Store(city, []string{})
+		s.storage.cities.Store(city, []string{})
 	}
 
 	availableCities := s.AvailableCities()

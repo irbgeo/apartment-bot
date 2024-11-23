@@ -54,14 +54,14 @@ func NewSSGEProvider() *ssge {
 	return p
 }
 
-func (s *ssge) Start(opts StartOpts) error {
+func (s *ssge) Start(refreshTokenInterval time.Duration) error {
 	err := s.refreshToken()
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		refreshTokenTicker := time.NewTicker(opts.RefreshTokenInterval)
+		refreshTokenTicker := time.NewTicker(refreshTokenInterval)
 		defer refreshTokenTicker.Stop()
 
 		for {
