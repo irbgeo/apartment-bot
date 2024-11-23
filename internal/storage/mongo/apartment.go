@@ -35,7 +35,7 @@ func (s *mongoDB) SaveApartment(ctx context.Context, a server.Apartment) error {
 	return s.insert(ctx, apartmentCollection, toMongoApartment(a))
 }
 
-func (s *mongoDB) Apartment(ctx context.Context, f server.Filter) (<-chan server.Apartment, error) {
+func (s *mongoDB) Apartments(ctx context.Context, f server.Filter) (<-chan server.Apartment, error) {
 	resultCh, err := find[apartment](ctx, s, apartmentCollection, toMongoFilter(f))
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ type filter struct {
 
 type storage interface {
 	SaveFilter(ctx context.Context, f server.Filter) error
-	FilterList(ctx context.Context, f server.Filter) ([]server.Filter, error)
+	Filters(ctx context.Context, f server.Filter) ([]server.Filter, error)
 	DeleteFilter(ctx context.Context, f server.Filter) error
 }
 
@@ -26,7 +26,7 @@ func New(filterStorage storage) (*filter, error) {
 		storage: filterStorage,
 	}
 
-	filterList, err := f.storage.FilterList(context.Background(), server.Filter{})
+	filterList, err := f.storage.Filters(context.Background(), server.Filter{})
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (s *filter) Check(ctx context.Context, a *server.Apartment) {
 }
 
 func (s *filter) Get(ctx context.Context, f server.Filter) (*server.Filter, error) {
-	filterList, err := s.storage.FilterList(context.Background(), f)
+	filterList, err := s.storage.Filters(context.Background(), f)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *filter) Get(ctx context.Context, f server.Filter) (*server.Filter, erro
 }
 
 func (s *filter) GetForUser(ctx context.Context, id int64) ([]server.Filter, error) {
-	filterList, err := s.storage.FilterList(context.Background(), server.Filter{User: &server.User{ID: id}})
+	filterList, err := s.storage.Filters(context.Background(), server.Filter{User: &server.User{ID: id}})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (s *filter) GetForUser(ctx context.Context, id int64) ([]server.Filter, err
 }
 
 func (s *filter) Delete(ctx context.Context, f server.Filter) error {
-	filterList, err := s.storage.FilterList(context.Background(), f)
+	filterList, err := s.storage.Filters(context.Background(), f)
 	if err != nil {
 		return err
 	}

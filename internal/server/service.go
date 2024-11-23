@@ -42,7 +42,7 @@ type apartment interface {
 type storage interface {
 	SaveApartment(ctx context.Context, a Apartment) error
 	UpdateApartment(ctx context.Context, a Apartment) error
-	Apartment(ctx context.Context, f Filter) (<-chan Apartment, error)
+	Apartments(ctx context.Context, f Filter) (<-chan Apartment, error)
 	ApartmentCount(ctx context.Context, f Filter) (int64, error)
 	DeleteApartment(ctx context.Context, a Apartment) error
 	DeleteApartments(ctx context.Context) error
@@ -164,7 +164,7 @@ func (s *service) RefreshApartments() error {
 func (s *service) Stop() {
 	s.cancel()
 	s.subscribers.Range(func(_, value any) bool {
-		close(value.(chan Apartment))
+		close(value.(chan Apartment)) // nolint: errcheck
 		return true
 	})
 }
@@ -278,7 +278,7 @@ func (s *service) Apartments(ctx context.Context, f Filter) (<-chan Apartment, e
 		return nil, err
 	}
 
-	apartmentCh, err := s.storage.Apartment(ctx, *filter) // nolint: errcheck
+	apartmentCh, err := s.storage.Apartments(ctx, *filter) // nolint: errcheck
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (s *service) Apartments(ctx context.Context, f Filter) (<-chan Apartment, e
 }
 
 func (s *service) checkSavedApartment(ctx context.Context) error {
-	apartmentCh, err := s.storage.Apartment(ctx, Filter{})
+	apartmentCh, err := s.storage.Apartments(ctx, Filter{})
 	if err != nil {
 		return fmt.Errorf("get apartments: %w", err)
 	}

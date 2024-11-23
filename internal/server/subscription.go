@@ -27,7 +27,7 @@ func (s *service) Unsubscribe(ctx context.Context) {
 	subCh, isExist := s.subscribers.Load(id)
 	if isExist {
 		s.subscribers.Delete(id)
-		close(subCh.(chan Apartment))
+		close(subCh.(chan Apartment)) // nolint: errcheck
 	}
 
 	slog.Info("unsubscribed", "id", id)

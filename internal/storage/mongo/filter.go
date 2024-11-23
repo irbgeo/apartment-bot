@@ -34,7 +34,7 @@ func (s *mongoDB) SaveFilter(ctx context.Context, f server.Filter) error {
 	return s.upsert(ctx, filterCollection, filter, newFilter)
 }
 
-func (s *mongoDB) FilterList(ctx context.Context, f server.Filter) ([]server.Filter, error) {
+func (s *mongoDB) Filters(ctx context.Context, f server.Filter) ([]server.Filter, error) {
 	resultCh, err := find[filter](ctx, s, filterCollection, toMongoFilter(f))
 	if err != nil {
 		return nil, err

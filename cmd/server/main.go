@@ -92,7 +92,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	savedApartmentCh, err := stor.Apartment(ctx, server.Filter{})
+	savedApartmentCh, err := stor.Apartments(ctx, server.Filter{})
 	if err != nil {
 		slog.Error("get saved apartments", "err", err)
 		os.Exit(1)

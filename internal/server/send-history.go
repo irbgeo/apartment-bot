@@ -41,6 +41,6 @@ func (s *service) stopSendHistoryData(f Filter) {
 		return
 	}
 
-	cancel.(context.CancelFunc)()
+	cancel.(context.CancelFunc)() // nolint: errcheck
 	s.historySending.Delete(f.ID)
 }
