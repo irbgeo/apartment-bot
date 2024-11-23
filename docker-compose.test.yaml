@@ -53,8 +53,8 @@ services:
       context: .
       dockerfile: cmd/client/Dockerfile
     environment:
-      server_URL: server:9000
-      MESSAGE_URL: message:9000
+      SERVER_URL: server:9000
+      MESSAGE_URL: message:9001
       TELEGRAM_BOT_SECRET: ${TELEGRAM_BOT_SECRET}
       AUTH_TOKEN: ${AUTH_TOKEN}
     depends_on:

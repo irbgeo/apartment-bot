@@ -30,7 +30,7 @@ func (s *service) cancelBtn(c tele.Context) error {
 }
 
 func (s *service) cleanUserActions(userID int64) error {
-	if err := s.messages.CleanTill(userID, settingFilterMessage); err != nil {
+	if err := s.messages.CleanMessagesUntil(userID, settingFilterMessage); err != nil {
 		return err
 	}
 	s.userAction.Delete(userID)

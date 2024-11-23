@@ -26,7 +26,7 @@ func (s *service) getOldApartmentsBtn(c tele.Context) error {
 		return err
 	}
 
-	err = s.messages.Clean(userID)
+	err = s.messages.CleanUserMessages(userID)
 	if err != nil {
 		return err
 	}

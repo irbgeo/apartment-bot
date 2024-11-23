@@ -50,14 +50,14 @@ func (s *service) sendErrorMessage(c tele.Context, err error) error {
 		msg = fmt.Sprintf(notActiveFilterMessageLayout, filterCommand)
 	}
 
-	m, err := s.b.Send(c.Sender(), msg)
+	m, err := s.sendMessageToBot(userID, msg)
 	if err != nil {
 		return err
 	}
-	s.messages.Store(userID, m, errMessage)
+	s.messages.StoreMessage(userID, m, errMessage)
 
 	if actionType, isExist := s.userAction.Load(userID); isExist {
-		if err := s.params[actionType.(string)].init(c); err != nil {
+		if err := s.params[actionType.(string)].init(c); err != nil { // nolint: errcheck
 			return err
 		}
 	}

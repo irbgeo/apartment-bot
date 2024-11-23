@@ -18,22 +18,19 @@ var (
 )
 
 type service struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	b      *tele.Bot
-
-	message             messageSvc
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	b                   *tele.Bot
 	service             apartmentSvc
 	adminUsername       string
 	maxPhotoCount       int
 	messageSendInterval time.Duration
-
-	userAction sync.Map
-	messages   messageStack
-
-	params      map[string]param
-	btn         map[string]changeFunc
-	settingBtns [][][]func(f *server.Filter) tele.Btn
+	userAction          sync.Map
+	messages            messageStack
+	params              map[string]param
+	btn                 map[string]changeFunc
+	settingBtns         [][][]func(f *server.Filter) tele.Btn
+	sendMessageCh       chan Message
 }
 
 //go:generate mockery --name apartmentSvc --structname ApartmentSvc
@@ -71,32 +68,22 @@ type apartmentSvc interface {
 	BlockErrorHandler(ctx context.Context, u *server.User, err error)
 }
 
-//go:generate mockery --name messageSvc --structname MessageSvc
-type messageSvc interface {
-	StartWatcher(ctx context.Context) (<-chan Message, <-chan error, error)
-}
-
 //go:generate mockery --name messageStack --structname MessageStack
 type messageStack interface {
 	SetBot(b *tele.Bot)
-	Store(userID int64, m *tele.Message, t MessageType)
+	StoreMessage(userID int64, m *tele.Message, t MessageType)
 	GetOrCleanTill(userID int64, goalType, tillType MessageType) (*tele.Message, bool, error)
-	Clean(userID int64) error
-	CleanTill(userID int64, t MessageType) error
+	CleanUserMessages(userID int64) error
+	CleanMessagesUntil(userID int64, t MessageType) error
 }
 
 func NewService(
-	token string,
+	cfg StartConfig,
 	aSvc apartmentSvc,
-	mSvc messageSvc,
 	mStack messageStack,
-	disabledParameters []string,
-	adminUsername string,
-	maxPhotoCount int,
-	messageSendInterval time.Duration,
 ) (*service, error) {
 	b, err := tele.NewBot(tele.Settings{
-		Token:  token,
+		Token:  cfg.Token,
 		Poller: &tele.LongPoller{Timeout: botTimeout},
 	})
 	if err != nil {
@@ -106,157 +93,126 @@ func NewService(
 	mStack.SetBot(b)
 
 	t := &service{
-		b:        b,
-		messages: mStack,
-
-		message:             mSvc,
+		b:                   b,
+		messages:            mStack,
 		service:             aSvc,
-		adminUsername:       adminUsername,
-		maxPhotoCount:       maxPhotoCount,
-		messageSendInterval: messageSendInterval,
+		adminUsername:       cfg.AdminUsername,
+		maxPhotoCount:       cfg.MaxPhotoCount,
+		messageSendInterval: cfg.MessageSendInterval,
+		sendMessageCh:       make(chan Message),
 	}
 
-	t.params = map[string]param{
+	t.initParams(cfg.DisabledParameters)
+	t.initBtns()
+	t.initHandlers()
+
+	return t, nil
+}
+
+func (s *service) initParams(disabledParameters []string) {
+	s.params = map[string]param{
 		changeName: {
-			init:     t.changeNameInit,
-			change:   t.changeName,
-			toString: t.nameParamToString,
+			init:     s.changeNameInit,
+			change:   s.changeName,
+			toString: s.nameParamToString,
 		},
-
 		changeAdType: {
-			init:     t.changeTypeInit,
-			change:   t.changeAdType,
-			toString: t.adTypeParamToString,
+			init:     s.changeTypeInit,
+			change:   s.changeAdType,
+			toString: s.adTypeParamToString,
 		},
-
 		changeBuildingStatus: {
-			init:     t.changeBuildingStatusInit,
-			change:   t.changeBuildingStatus,
-			toString: t.buildingStatusParamToString,
+			init:     s.changeBuildingStatusInit,
+			change:   s.changeBuildingStatus,
+			toString: s.buildingStatusParamToString,
 		},
-
 		changeCity: {
-			init:     t.changeCityInit,
-			change:   t.changeCity,
-			toString: t.cityParamToString,
+			init:     s.changeCityInit,
+			change:   s.changeCity,
+			toString: s.cityParamToString,
 		},
-
 		changeDistrict: {
-			init:     t.changeDistrictInit,
-			change:   t.changeDistrict,
-			toString: t.districtParamToString,
+			init:     s.changeDistrictInit,
+			change:   s.changeDistrict,
+			toString: s.districtParamToString,
 		},
-
 		changeMinPrice: {
-			init:     t.changePriceInit(true),
-			change:   t.changePrice(true),
-			toString: t.priceParamToString,
+			init:     s.changePriceInit(true),
+			change:   s.changePrice(true),
+			toString: s.priceParamToString,
 		},
-
 		changeMaxPrice: {
-			init:   t.changePriceInit(false),
-			change: t.changePrice(false),
+			init:   s.changePriceInit(false),
+			change: s.changePrice(false),
 		},
-
 		changeMinRooms: {
-			init:     t.changeRoomsInit(true),
-			change:   t.changeRooms(true),
-			toString: t.roomsParamToString,
+			init:     s.changeRoomsInit(true),
+			change:   s.changeRooms(true),
+			toString: s.roomsParamToString,
 		},
-
 		changeMaxRooms: {
-			init:   t.changeRoomsInit(false),
-			change: t.changeRooms(false),
+			init:   s.changeRoomsInit(false),
+			change: s.changeRooms(false),
 		},
-
 		changeMinArea: {
-			init:     t.changeAreaInit(true),
-			change:   t.changeArea(true),
-			toString: t.areaParamToString,
+			init:     s.changeAreaInit(true),
+			change:   s.changeArea(true),
+			toString: s.areaParamToString,
 		},
-
 		changeMaxArea: {
-			init:   t.changeAreaInit(false),
-			change: t.changeArea(false),
+			init:   s.changeAreaInit(false),
+			change: s.changeArea(false),
 		},
-
 		changeLocation: {
-			init:     t.changeLocationInit,
-			change:   t.changeLocation,
-			toString: t.locationParamToString,
+			init:     s.changeLocationInit,
+			change:   s.changeLocation,
+			toString: s.locationParamToString,
 		},
-
 		changeMaxDistance: {
-			init:     t.changeMaxDistanceInit,
-			change:   t.changeMaxDistance,
-			toString: t.maxDistanceParamToString,
+			init:     s.changeMaxDistanceInit,
+			change:   s.changeMaxDistance,
+			toString: s.maxDistanceParamToString,
 		},
-
 		changeOwnerType: {
-			init:     t.changeOwnerTypeInit,
-			change:   t.changeOwnerType,
-			toString: t.ownerTypeParamToString,
-		},
-	}
-
-	t.settingBtns = [][][]func(f *server.Filter) tele.Btn{
-		{
-			{changeNameBtn},
-			{changeCityBtn, t.changeDistrictBtn},
-			{t.changePriceBtn(true), t.changePriceBtn(false)},
-			{t.changeAreaBtn(true), t.changeAreaBtn(false)},
-			{changeLocationBtn, changeMaxDistanceBtn},
-		},
-		{
-			{t.changeRoomsBtn(true), t.changeRoomsBtn(false)},
-			{t.changeAdTypeBtn, t.changeOwnerTypeBtn},
-			{t.changeBuildingStatusBtn},
+			init:     s.changeOwnerTypeInit,
+			change:   s.changeOwnerType,
+			toString: s.ownerTypeParamToString,
 		},
 	}
 
 	for _, param := range disabledParameters {
-		delete(t.params, param)
+		delete(s.params, param)
 	}
+}
 
-	t.btn = map[string]changeFunc{
-		filterSetting:       t.nextSettingPageBtn,
-		btnCancel:           t.cancelBtn,
-		btnOk:               t.okBtn,
-		btnDelete:           t.deleteBtn,
-		changeStateBtn:      t.changeStateBtn,
-		btnGetOldApartments: t.getOldApartmentsBtn,
-		btnGetNewApartments: t.getNewApartmentsBtn,
+func (s *service) initBtns() {
+	s.btn = map[string]changeFunc{
+		filterSetting:       s.nextSettingPageBtn,
+		btnCancel:           s.cancelBtn,
+		btnOk:               s.okBtn,
+		btnDelete:           s.deleteBtn,
+		changeStateBtn:      s.changeStateBtn,
+		btnGetOldApartments: s.getOldApartmentsBtn,
+		btnGetNewApartments: s.getNewApartmentsBtn,
 	}
+}
 
-	b.Use(t.errorMiddleware)
-	b.Handle("/start", t.startChatHandler)
-	b.Handle(filterCommand, t.startCreatingFilterHandler)
-	b.Handle("/get_filters", t.filtersListHandler)
-	b.Handle("/help", t.helpHandler)
-
-	b.Handle(tele.OnCallback, t.callbackHandler)
-	b.Handle(tele.OnText, t.messageHandler)
-	b.Handle(tele.OnLocation, t.locationHandler)
-
-	return t, nil
+func (s *service) initHandlers() {
+	s.b.Use(s.errorMiddleware)
+	s.b.Handle("/start", s.startChatHandler)
+	s.b.Handle(filterCommand, s.startCreatingFilterHandler)
+	s.b.Handle("/get_filters", s.filtersListHandler)
+	s.b.Handle("/help", s.helpHandler)
+	s.b.Handle(tele.OnCallback, s.callbackHandler)
+	s.b.Handle(tele.OnText, s.messageHandler)
+	s.b.Handle(tele.OnLocation, s.locationHandler)
 }
 
 func (s *service) Start() error {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	messageCh, errCh, err := s.message.StartWatcher(s.ctx)
-	if err != nil {
-		return err
-	}
-	go s.messageRuntime(
-		messageCh,
-		errCh,
-	)
-
-	apartmentCh := s.service.Watcher()
-	go s.apartmentRuntime(
-		apartmentCh,
-	)
+	go s.sendingMessage(s.ctx)
+	go s.apartmentRuntime(s.service.Watcher())
 	go s.b.Start()
 
 	return nil
@@ -281,18 +237,23 @@ func (s *service) apartmentRuntime(apartmentCh <-chan server.Apartment) {
 	}
 }
 
-func (s *service) messageRuntime(messageCh <-chan Message, errCh <-chan error) {
+func (s *service) sendingMessage(ctx context.Context) {
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
-		case <-errCh:
-			slog.Error("message_runtime", "err", errCh)
-		case m, ok := <-messageCh:
-			if !ok {
-				return
+		case m := <-s.sendMessageCh:
+			_, err := s.sendMessageToBot(m.UserID, m.What, m.Opts...)
+			if err != nil {
+				s.handleError(m.UserID, err)
 			}
-			s.sendPinMessage(m)
+
+			interval := s.messageSendInterval
+			if err != nil {
+				interval = s.extractRetryTime(err.Error())
+				slog.Info("sendApartmentAlbum", "interval", interval)
+			}
+			<-time.After(interval)
 		}
 	}
 }
@@ -303,7 +264,7 @@ func (s *service) startChatHandler(c tele.Context) error {
 		return err
 	}
 
-	err = c.Send(startChatMessage)
+	_, err = s.sendMessageToBot(c.Sender().ID, startChatMessage)
 	if err != nil {
 		return err
 	}
@@ -314,14 +275,14 @@ func (s *service) startChatHandler(c tele.Context) error {
 func (s *service) startCreatingFilterHandler(c tele.Context) error {
 	userID := c.Sender().ID
 
-	err := s.messages.Clean(userID)
+	err := s.messages.CleanUserMessages(userID)
 	if err != nil {
 		return err
 	}
 
 	s.userAction.Delete(userID)
 
-	err = c.Send(creatingFilterInfoMessage)
+	_, err = s.sendMessageToBot(userID, creatingFilterMessage)
 	if err != nil {
 		return err
 	}
@@ -338,7 +299,7 @@ func (s *service) filtersListHandler(c tele.Context) error {
 		return nil
 	}
 
-	err = s.messages.Clean(c.Sender().ID)
+	err = s.messages.CleanUserMessages(c.Sender().ID)
 	if err != nil {
 		return err
 	}
@@ -349,22 +310,22 @@ func (s *service) filtersListHandler(c tele.Context) error {
 		msg = "A list of your filters is available\n" + filtersStr(filters)
 	}
 
-	m, err := s.b.Send(c.Sender(), msg, s.filterMenu(filters))
+	m, err := s.sendMessageToBot(c.Sender().ID, msg, s.filterMenu(filters))
 	if err != nil {
 		return err
 	}
-	s.messages.Store(c.Chat().ID, m, settingFilterMessage)
+	s.messages.StoreMessage(c.Chat().ID, m, settingFilterMessage)
 
 	return nil
 }
 
 func (s *service) helpHandler(c tele.Context) error {
-	m, err := s.b.Send(c.Sender(), fmt.Sprintf(helpMessage, s.adminUsername))
+	m, err := s.sendMessageToBot(c.Sender().ID, fmt.Sprintf(helpMessage, s.adminUsername))
 	if err != nil {
 		return err
 	}
 
-	s.messages.Store(c.Chat().ID, m, botMessage)
+	s.messages.StoreMessage(c.Chat().ID, m, botMessage)
 	return nil
 }
 
@@ -374,7 +335,7 @@ func (s *service) callbackHandler(c tele.Context) error {
 	actionValue := getValue(c)
 
 	a, isExist := s.userAction.Load(userID)
-	if isExist && a.(string) == actionType && len(actionValue) != 0 && actionValue[0] != nextPage {
+	if isExist && a.(string) == actionType && len(actionValue) != 0 && actionValue[0] != nextPage { // nolint:errcheck
 		return s.params[actionType].change(c)
 	}
 
@@ -396,31 +357,31 @@ func (s *service) callbackHandler(c tele.Context) error {
 func (s *service) messageHandler(c tele.Context) error {
 	userID := c.Sender().ID
 
-	s.messages.Store(userID, c.Message(), userMassage)
+	s.messages.StoreMessage(userID, c.Message(), userMassage)
 
 	action, isExist := s.userAction.Load(userID)
 	if !isExist {
 		return s.chooseFilter(c)
 	}
 
-	return s.params[action.(string)].change(c)
+	return s.params[action.(string)].change(c) // nolint: errcheck
 }
 
 func (s *service) locationHandler(c tele.Context) error {
 	userID := c.Sender().ID
 
-	s.messages.Store(userID, c.Message(), userMassage)
+	s.messages.StoreMessage(userID, c.Message(), userMassage)
 
 	action, isExist := s.userAction.Load(userID)
 	if isExist {
-		return s.params[action.(string)].change(c)
+		return s.params[action.(string)].change(c) // nolint: errcheck
 	}
 
-	m, err := s.b.Send(c.Sender(), unknownCommandMessage)
+	m, err := s.sendMessageToBot(c.Sender().ID, unknownCommandMessage)
 	if err != nil {
 		return err
 	}
-	s.messages.Store(userID, m, botMessage)
+	s.messages.StoreMessage(userID, m, botMessage)
 	return nil
 }
 
@@ -439,7 +400,7 @@ func (s *service) chooseFilter(c tele.Context) error {
 		return err
 	}
 
-	err = s.messages.Clean(userID)
+	err = s.messages.CleanUserMessages(userID)
 	if err != nil {
 		return err
 	}
@@ -447,4 +408,18 @@ func (s *service) chooseFilter(c tele.Context) error {
 	s.userAction.Delete(c.Sender().ID)
 
 	return s.sendSettingFilter(c, filter)
+}
+
+func (s *service) sendMessageToBot(userID int64, what interface{}, opts ...interface{}) (*tele.Message, error) {
+	m := Message{
+		UserID: userID,
+		What:   what,
+		Opts:   opts,
+		Answer: make(chan answer),
+	}
+
+	s.sendMessageCh <- m
+	answer := <-m.Answer
+
+	return answer.m, answer.err
 }

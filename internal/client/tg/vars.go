@@ -22,7 +22,7 @@ var (
 	helpMessage = `Instructions: https://telegra.ph/Apartments-in-Georgia-bot-04-07
 If you have any questions, contact us at @%s.`
 
-	creatingFilterInfoMessage = `Let's start creating a filter for apartment hunting! Specify the parameters you need.
+	creatingFilterMessage = `Let's start creating a filter for apartment hunting! Specify the parameters you need.
 
 	To adjust apartment search parameters, click on ⚙️. Then press ✅ to save the filter and start receiving relevant listings. If you need to modify the criteria or delete the filter, select it from the menu below the message input field.
 	

@@ -11,6 +11,10 @@ import (
 	"github.com/irbgeo/apartment-bot/internal/server"
 )
 
+func (s *service) cleanUserMessages(userID int64) error {
+	return s.messages.CleanUserMessages(userID)
+}
+
 func filtersStr(filters []server.Filter) string {
 	var result strings.Builder
 	for _, f := range filters {
@@ -88,13 +92,6 @@ func getValue(c tele.Context) []string {
 	return nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 var (
 	horizontalN = 4
 	verticalN   = 3
@@ -137,8 +134,4 @@ func getImageSizeMB(url string) (float64, error) {
 
 func nextPageIdx(currentPage, numberOfPages int) int {
 	return (currentPage + 1) % numberOfPages
-}
-
-func (s *service) cleanUserMessages(userID int64) error {
-	return s.messages.Clean(userID)
 }

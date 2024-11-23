@@ -1,8 +1,9 @@
 
-include .env
+include .env .env.secret
 
 env:
 	$(.env)
+	$(.env.secret)
 	@echo SERVER_VERSION:$(SERVER_VERSION)
 	@echo CLIENT_VERSION:$(CLIENT_VERSION)
 	@echo MESSAGE_VERSION:$(MESSAGE_VERSION)
@@ -26,7 +27,7 @@ test: generate lint
 	go test -v ./...
 
 build-and-push-service:
-	docker build --platform linux/amd64 -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(SERVICE):$(VERSION) .
+	docker build  -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(SERVICE):$(VERSION) .
 	docker push irbgeo/$(SERVICE):$(VERSION)
 
 build-and-push-all: env
@@ -40,7 +41,7 @@ run-test: env
 stop-test: env
 	docker compose -f ./docker-compose.test.yaml down
 
-run:
+run: env
 	docker compose up -d
 
 

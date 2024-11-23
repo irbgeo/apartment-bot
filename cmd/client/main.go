@@ -9,7 +9,6 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	apiMessage "github.com/irbgeo/apartment-bot/internal/api/message"
 	apiserver "github.com/irbgeo/apartment-bot/internal/api/server"
 	"github.com/irbgeo/apartment-bot/internal/client"
 	tgbot "github.com/irbgeo/apartment-bot/internal/client/tg"
@@ -46,12 +45,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	messageCli, err := apiMessage.NewClient(cfg.MessageURL, cfg.AuthToken)
-	if err != nil {
-		slog.Error("init server cli", "err", err)
-		os.Exit(1)
-	}
-
 	cli, err := client.NewService(serverCli, cfg.FirstCities)
 	if err != nil {
 		slog.Error("init client", "err", err)
@@ -64,17 +57,20 @@ func main() {
 	}
 	defer cli.Stop()
 
-	massageStack := message.NewStack()
+	massageStack := message.NewService()
+
+	botCfg := tgbot.StartConfig{
+		Token:               cfg.TelegramBotSecret,
+		DisabledParameters:  cfg.TelegramBotDisabledParameters,
+		AdminUsername:       cfg.TelegramBotAdminUsername,
+		MaxPhotoCount:       cfg.TelegramBotMaxCountSendMessagesPerPeriod,
+		MessageSendInterval: cfg.TelegramBotSendPeriod,
+	}
 
 	b, err := tgbot.NewService(
-		cfg.TelegramBotSecret,
+		botCfg,
 		cli,
-		messageCli,
 		massageStack,
-		cfg.TelegramBotDisabledParameters,
-		cfg.TelegramBotAdminUsername,
-		cfg.TelegramBotMaxCountSendMessagesPerPeriod,
-		cfg.TelegramBotSendPeriod,
 	)
 	if err != nil {
 		slog.Error("init bot", "err", err)

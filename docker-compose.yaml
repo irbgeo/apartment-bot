@@ -11,6 +11,7 @@ services:
       - "27017:27017"
     volumes:
       - mongo:/data/db
+    restart: always
 
   server:
     image: irbgeo/server:${SERVER_VERSION}

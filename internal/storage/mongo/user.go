@@ -6,7 +6,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/irbgeo/apartment-bot/internal/message"
 	"github.com/irbgeo/apartment-bot/internal/server"
 )
 
@@ -34,31 +33,6 @@ func (s *mongoDB) DeleteUser(ctx context.Context, u server.User) error {
 		},
 	}
 	return s.delete(ctx, userCollection, toMongoFilter(f))
-}
-
-func (s *mongoDB) Users(ctx context.Context) (<-chan message.User, error) {
-	resultCh, err := find[user](ctx, s, userCollection, filter{})
-	if err != nil {
-		return nil, err
-	}
-
-	userCh := make(chan message.User)
-	go func() {
-		defer close(userCh)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case u, ok := <-resultCh:
-				if !ok {
-					return
-				}
-				userCh <- toMessageUser(u)
-			}
-		}
-	}()
-
-	return userCh, nil
 }
 
 func (s *mongoDB) User(ctx context.Context, f server.Filter) (server.User, error) {

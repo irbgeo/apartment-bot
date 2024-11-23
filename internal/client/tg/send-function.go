@@ -2,10 +2,8 @@ package tg
 
 import (
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
-	"time"
 
 	tele "gopkg.in/telebot.v3"
 
@@ -26,55 +24,27 @@ func (s *service) sendApartment(a server.Apartment) {
 		default:
 		}
 
-		var err error
+		if !s.service.IsAllow(userID) {
+			return
+		}
+
+		var (
+			err     error
+			message any
+		)
 
 		switch messageCount {
 		case 0:
-			err = s.sendSingleApartmentMessage(userID, a, filters)
+			message = apartmentString(a, filters)
 		default:
-			err = s.sendApartmentAlbum(userID, apartmentAlbum)
+			message = apartmentAlbum
 		}
 
+		_, err = s.sendMessageToBot(userID, message)
 		if err != nil {
 			s.handleError(userID, err)
 		}
 	}
-}
-
-func (s *service) sendSingleApartmentMessage(userID int64, a server.Apartment, filters []string) error {
-	var err error
-	if !s.service.IsAllow(userID) {
-		return nil
-	}
-	defer func() {
-		interval := s.messageSendInterval
-		if err != nil {
-			interval = s.extractRetryTime(err.Error())
-			slog.Info("sendApartmentAlbum", "interval", interval)
-		}
-		<-time.After(interval)
-	}()
-
-	_, err = s.b.Send(&tele.User{ID: userID}, apartmentString(a, filters))
-	return err
-}
-
-func (s *service) sendApartmentAlbum(userID int64, apartmentAlbum tele.Album) error {
-	var err error
-	if !s.service.IsAllow(userID) {
-		return nil
-	}
-	defer func() {
-		interval := s.messageSendInterval
-		if err != nil {
-			interval = s.extractRetryTime(err.Error())
-			slog.Info("sendApartmentAlbum", "interval", interval)
-		}
-		<-time.After(interval)
-	}()
-
-	_, err = s.b.SendAlbum(&tele.User{ID: userID}, apartmentAlbum)
-	return err
 }
 
 func (s *service) apartmentMessage(a server.Apartment, filters []string) (int, tele.Album) {
@@ -114,23 +84,6 @@ func (s *service) apartmentMessage(a server.Apartment, filters []string) (int, t
 	return messageCount, resultAlbum
 }
 
-func (s *service) sendPinMessage(msg Message) {
-	if !s.service.IsAllow(msg.UserID) {
-		return
-	}
-
-	m, err := s.b.Send(&tele.User{ID: msg.UserID}, msg.Text)
-	if err != nil {
-		s.handleError(msg.UserID, err)
-		return
-	}
-
-	err = s.b.Pin(m)
-	if err != nil {
-		s.handleError(msg.UserID, err)
-	}
-}
-
 func (s *service) sendSettingFilter(c tele.Context, f *server.Filter) error {
 	values := getValue(c)
 
@@ -151,7 +104,7 @@ func (s *service) sendSettingFilter(c tele.Context, f *server.Filter) error {
 func (s *service) sendSavedFilter(c tele.Context, count int64, f *server.Filter) error {
 	userID := c.Sender().ID
 
-	err := s.messages.Clean(userID)
+	err := s.messages.CleanUserMessages(userID)
 	if err != nil {
 		return err
 	}
@@ -162,12 +115,12 @@ func (s *service) sendSavedFilter(c tele.Context, count int64, f *server.Filter)
 		markup = filterSavedMarkup(f.ID, count)
 	}
 
-	m, err := s.b.Send(c.Sender(), msg, markup)
+	m, err := s.sendMessageToBot(userID, msg, markup)
 	if err != nil {
 		return err
 	}
 
-	s.messages.Store(userID, m, botMessage)
+	s.messages.StoreMessage(userID, m, botMessage)
 
 	return nil
 }
@@ -179,12 +132,12 @@ func (s *service) sendMessage(msg *tele.Message, messageType MessageType) error 
 	}
 
 	if !isExist {
-		m, err := s.b.Send(msg.Sender, msg.Text, msg.ReplyMarkup)
+		m, err := s.sendMessageToBot(msg.Sender.ID, msg.Text, msg.ReplyMarkup)
 		if err != nil {
 			return err
 		}
 
-		s.messages.Store(msg.Sender.ID, m, messageType)
+		s.messages.StoreMessage(msg.Sender.ID, m, messageType)
 		return nil
 	}
 
@@ -193,7 +146,7 @@ func (s *service) sendMessage(msg *tele.Message, messageType MessageType) error 
 		return err
 	}
 
-	s.messages.Store(msg.Sender.ID, m, messageType)
+	s.messages.StoreMessage(msg.Sender.ID, m, messageType)
 	return nil
 }
 
@@ -226,14 +179,14 @@ func (s *service) filterString(f *server.Filter) string {
 	return strings.Join(parts, "\n")
 }
 
-func rangeStr(min, max *float64) string {
+func rangeStr(minValue, maxValue *float64) string {
 	switch {
-	case min != nil && max != nil:
-		return fmt.Sprintf("%0.0f - %0.0f", *min, *max)
-	case min != nil:
-		return fmt.Sprintf("%0.0f - ∞", *min)
-	case max != nil:
-		return fmt.Sprintf("0 - %0.0f", *max)
+	case minValue != nil && maxValue != nil:
+		return fmt.Sprintf("%0.0f - %0.0f", *minValue, *maxValue)
+	case minValue != nil:
+		return fmt.Sprintf("%0.0f - ∞", *minValue)
+	case maxValue != nil:
+		return fmt.Sprintf("0 - %0.0f", *maxValue)
 	}
 
 	return anyValue

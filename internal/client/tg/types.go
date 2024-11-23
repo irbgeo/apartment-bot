@@ -1,10 +1,20 @@
 package tg
 
 import (
+	"time"
+
 	tele "gopkg.in/telebot.v3"
 
 	"github.com/irbgeo/apartment-bot/internal/server"
 )
+
+type StartConfig struct {
+	Token               string
+	DisabledParameters  []string
+	AdminUsername       string
+	MaxPhotoCount       int
+	MessageSendInterval time.Duration
+}
 
 type MessageType int64
 
@@ -28,5 +38,12 @@ type paramStrFunc func(f *server.Filter) string
 
 type Message struct {
 	UserID int64
-	Text   string
+	What   any
+	Opts   []any
+	Answer chan answer
+}
+
+type answer struct {
+	m   *tele.Message
+	err error
 }

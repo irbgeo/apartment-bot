@@ -33,8 +33,7 @@ func NewClient(
 	)
 
 	if err != nil {
-		err = fmt.Errorf(status.Convert(err).Message())
-		return nil, err
+		return nil, fmt.Errorf("%s", status.Convert(err).Message())
 	}
 
 	cli := &client{
