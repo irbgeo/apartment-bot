@@ -1,5 +1,5 @@
 
-include .env
+include .env .env.secret
 
 SERVER_NAME=apartment-bot-server
 CLIENT_NAME=apartment-bot-client
@@ -8,7 +8,6 @@ env:
 	$(.env)
 	@echo SERVER_VERSION:$(SERVER_VERSION)
 	@echo CLIENT_VERSION:$(CLIENT_VERSION)
-	@echo MESSAGE_VERSION:$(MESSAGE_VERSION)
 	@echo AVAILABLE_CITIES:$(AVAILABLE_CITIES)
 	@echo TELEGRAM_BOT_SECRET:$(TELEGRAM_BOT_SECRET)
 	@echo MONGO_URL:$(MONGO_URL)
@@ -42,13 +41,13 @@ run-test: env
 stop-test: env
 	docker compose -f docker-compose.test.yaml down
 
-run: env
+run: 
 	docker compose up -d
 
-stop: env
+stop:
 	docker compose down
 
-run-mongo: env
+run-mongo: 
 	docker compose -f docker-compose.yaml up mongodb -d
 
 setup:

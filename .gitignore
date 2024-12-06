@@ -1,18 +1,27 @@
+# Secret and environment files
+.env.*
 *secret*
 *_old
-client-test/
+
+# Generated code
+*.pb.go
 mocks/
 
-*.pb.go
-
-*__debug_*
-
-.env.*
+# Test directories
+client-test/
 *-test/
 
-*.retry
+# Debug files
+*__debug_*
+
+# Python
 *.pyc
 __pycache__/
 .venv/
 
+# Ansible
+*.retry
 deploy/ansible/inventory/server
+
+# Data directories
+mongodb_data/
