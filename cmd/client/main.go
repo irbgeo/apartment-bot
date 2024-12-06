@@ -18,7 +18,7 @@ import (
 type configuration struct {
 	ServerURL                                string        `envconfig:"SERVER_URL" default:"localhost:9000"`
 	MessageURL                               string        `envconfig:"MESSAGE_URL" default:"localhost:9001"`
-	TelegramBotSecret                        string        `envconfig:"TELEGRAM_BOT_SECRET" required:"true"`
+	TelegramBotToken                         string        `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`
 	TelegramBotSendPeriod                    time.Duration `envconfig:"TELEGRAM_BOT_SEND_PERIOD" default:"10s"`
 	TelegramBotMaxCountSendMessagesPerPeriod int           `envconfig:"TELEGRAM_BOT_MAX_COUNT_SEND_MESSAGES_PER_PERIOD" default:"3"`
 	TelegramBotAdminUsername                 string        `envconfig:"TELEGRAM_BOT_ADMIN_USERNAME" default:"rent_apartment_georgia_bot_admin"`
@@ -60,7 +60,7 @@ func main() {
 	massageStack := message.NewService()
 
 	botCfg := tgbot.StartConfig{
-		Token:               cfg.TelegramBotSecret,
+		Token:               cfg.TelegramBotToken,
 		DisabledParameters:  cfg.TelegramBotDisabledParameters,
 		AdminUsername:       cfg.TelegramBotAdminUsername,
 		MaxPhotoCount:       cfg.TelegramBotMaxCountSendMessagesPerPeriod,

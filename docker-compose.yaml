@@ -47,7 +47,7 @@ services:
     environment:
       SERVER_URL: server:9000
       MESSAGE_URL: message:9001
-      TELEGRAM_BOT_SECRET: ${TELEGRAM_BOT_SECRET}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       AUTH_TOKEN: ${AUTH_TOKEN}
       TELEGRAM_BOT_DISABLED_PARAMS: ""
     depends_on:

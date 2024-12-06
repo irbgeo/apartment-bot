@@ -1,12 +1,11 @@
 
-include .env .env.secret
+include .env
 
 SERVER_NAME=apartment-bot-server
 CLIENT_NAME=apartment-bot-client
 
 env:
 	$(.env)
-	$(.env.secret)
 	@echo SERVER_VERSION:$(SERVER_VERSION)
 	@echo CLIENT_VERSION:$(CLIENT_VERSION)
 	@echo MESSAGE_VERSION:$(MESSAGE_VERSION)
@@ -45,6 +44,9 @@ stop-test: env
 
 run: env
 	docker compose up -d
+
+setup:
+	ansible-playbook -i deploy/inventory/server deploy/playbooks/setup.yaml
 
 
 

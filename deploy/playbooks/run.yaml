@@ -1,25 +1,25 @@
 ---
 - hosts: server
   become: true
+  vars_files:
+    - deploy/vars/secret.yaml
   tasks:
     - name: Copy env files
       copy:
-        src: "../../{{ item.src }}"
-        dest: "{{ item.dest }}"
-        mode: '0644'
+        src: "{{ item.src }}"
+        dest: "{{ project_path }}/{{ item.src }}"
+        mode: "0644"
       with_items:
-        - { src: '.env.secret', dest: '/root/apartment-bot/.env.secret' }
-        - { src: '.env', dest: '/root/apartment-bot/.env' }
+        - { src: ".env" }
       tags: copy_env
 
     - name: Run application
       command: make run
       args:
-        chdir: /root/apartment-bot
+        chdir: "{{ project_path }}"
+      environment:
+        TELEGRAM_BOT_TOKEN: "{{ telegram_bot_token }}"
+        AUTH_TOKEN: "{{ auth_token }}"
+        MONGO_URL: "{{ mongo_url }}"
+        MONGO_PASSWORD: "{{ mongo_password }}"
       tags: run
-      
-    - name: Remove secret env file
-      file:
-        path: /root/apartment-bot/.env.secret
-        state: absent
-      tags: cleanup
