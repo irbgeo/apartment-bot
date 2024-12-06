@@ -45,8 +45,17 @@ stop-test: env
 run: env
 	docker compose up -d
 
+stop: env
+	docker compose down
+
+run-mongo: env
+	docker compose -f docker-compose.yaml up mongodb -d
+
 setup:
 	ansible-playbook -i deploy/inventory/server deploy/playbooks/setup.yaml
+
+setup-development:
+	ansible-playbook -i deploy/inventory/server deploy/playbooks/development.yaml
 
 
 

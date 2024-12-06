@@ -4,15 +4,6 @@
   vars_files:
     - deploy/vars/secret.yaml
   tasks:
-    - name: Copy env files
-      copy:
-        src: "{{ item.src }}"
-        dest: "{{ project_path }}/{{ item.src }}"
-        mode: "0644"
-      with_items:
-        - { src: ".env" }
-      tags: copy_env
-
     - name: Run application
       command: make run
       args:
@@ -20,6 +11,7 @@
       environment:
         TELEGRAM_BOT_TOKEN: "{{ telegram_bot_token }}"
         AUTH_TOKEN: "{{ auth_token }}"
-        MONGO_URL: "{{ mongo_url }}"
         MONGO_PASSWORD: "{{ mongo_password }}"
+        SERVER_VERSION: "{{ server_version }}"
+        CLIENT_VERSION: "{{ client_version }}"
       tags: run

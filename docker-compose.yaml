@@ -19,7 +19,7 @@ services:
     ports:
       - "9000:9000"
     environment:
-      MONGO_URL: ${MONGO_URL}
+      MONGO_URL: mongodb://apartment:${MONGO_PASSWORD}@mongodb:27017/
       AUTH_TOKEN: ${AUTH_TOKEN}
       MY_HOME_MAX_PAGE: 30
     depends_on:
