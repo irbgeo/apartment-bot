@@ -13,10 +13,6 @@ import (
 	"github.com/irbgeo/apartment-bot/internal/server"
 )
 
-var (
-	botTimeout = 10 * time.Second
-)
-
 type service struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
@@ -83,9 +79,17 @@ func NewService(
 	mStack messageStack,
 ) (*service, error) {
 	b, err := tele.NewBot(tele.Settings{
-		Token:  cfg.Token,
-		Poller: &tele.LongPoller{Timeout: botTimeout},
+		Token: cfg.Token,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	webhook := &tele.Webhook{
+		Listen: "your-domain:8443",
+	}
+
+	err = b.SetWebhook(webhook)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo:/data/db
+      - ./mongodb_data:/data/db 
     restart: always
 
   server:
@@ -54,7 +54,3 @@ services:
       server:
         condition: service_healthy
     restart: always
-
-volumes:
-  mongo:
-
