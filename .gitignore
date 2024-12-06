@@ -9,3 +9,10 @@ mocks/
 
 .env.*
 *-test/
+
+*.retry
+*.pyc
+__pycache__/
+.venv/
+
+deploy/ansible/inventory/server

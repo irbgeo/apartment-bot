@@ -1,0 +1,25 @@
+---
+- hosts: server
+  become: true
+  tasks:
+    - name: Copy env files
+      copy:
+        src: "../../{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '0644'
+      with_items:
+        - { src: '.env.secret', dest: '/root/apartment-bot/.env.secret' }
+        - { src: '.env', dest: '/root/apartment-bot/.env' }
+      tags: copy_env
+
+    - name: Run application
+      command: make run
+      args:
+        chdir: /root/apartment-bot
+      tags: run
+      
+    - name: Remove secret env file
+      file:
+        path: /root/apartment-bot/.env.secret
+        state: absent
+      tags: cleanup

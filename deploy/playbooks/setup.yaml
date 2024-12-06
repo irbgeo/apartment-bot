@@ -1,0 +1,74 @@
+---
+- hosts: server
+  become: true
+  vars:
+    docker_username: "{{ lookup('env', 'DOCKER_USERNAME') }}"
+    docker_password: "{{ lookup('env', 'DOCKER_PASSWORD') }}"
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: install_packages
+
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+          - make
+        state: present
+      tags: install_packages
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      tags: install_packages
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+      tags: install_packages
+
+    - name: Install Docker
+      apt:
+        pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+      tags: install_packages
+
+    - name: Create apartment-bot directory
+      file:
+        path: /root/apartment-bot
+        state: directory
+        mode: "0755"
+      tags: copy_files
+
+    - name: Copy files to server
+      copy:
+        src: "../../{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      with_items:
+        - {
+            src: "docker-compose.yaml",
+            dest: "/root/apartment-bot/docker-compose.yaml",
+          }
+        - { src: "Makefile", dest: "/root/apartment-bot/Makefile" }
+      tags: copy_files
+
+    - name: Log into Docker registry
+      docker_login:
+        username: "{{ docker_username }}"
+        password: "{{ docker_password }}"
+        state: present
+      tags: docker_login

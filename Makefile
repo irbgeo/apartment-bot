@@ -38,10 +38,10 @@ build-and-push-all: env
 	$(MAKE) build-and-push-service SERVICE=$(CLIENT_NAME) VERSION=$(CLIENT_VERSION)
 
 run-test: env 
-	docker compose -f ./docker-compose.test.yaml up -d --build
+	docker compose -f docker-compose.test.yaml up -d --build
 
 stop-test: env
-	docker compose -f ./docker-compose.test.yaml down
+	docker compose -f docker-compose.test.yaml down
 
 run: env
 	docker compose up -d
