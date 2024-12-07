@@ -3,6 +3,7 @@ include .env .env.secret
 
 SERVER_NAME=server
 CLIENT_NAME=client
+PLATFORM=linux/amd64
 
 env:
 	$(.env)
@@ -29,7 +30,7 @@ test: generate lint
 
 build-and-push-service:
 	$(eval image_name=apartment-bot-$(SERVICE))
-	docker build  -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(image_name):$(VERSION) .
+	docker build  --platform $(PLATFORM) -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(image_name):$(VERSION) .
 	docker push irbgeo/$(image_name):$(VERSION)
 
 build-and-push-all: env
