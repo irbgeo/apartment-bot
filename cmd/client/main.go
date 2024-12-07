@@ -62,7 +62,6 @@ func main() {
 	botCfg := tgbot.StartConfig{
 		Token:               cfg.TelegramBotToken,
 		DisabledParameters:  cfg.TelegramBotDisabledParameters,
-		AdminUsername:       cfg.TelegramBotAdminUsername,
 		MaxPhotoCount:       cfg.TelegramBotMaxCountSendMessagesPerPeriod,
 		MessageSendInterval: cfg.TelegramBotSendPeriod,
 	}

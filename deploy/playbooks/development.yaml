@@ -20,7 +20,7 @@
 
     - name: Download latest Go version
       get_url:
-        url: https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
+        url: https://go.dev/dl/go1.23.4.linux-amd64.tar.gz
         dest: /tmp/go.tar.gz
         mode: "0644"
       tags: install_golang
@@ -42,9 +42,9 @@
       blockinfile:
         path: /root/.bashrc
         block: |
-          export PATH=$PATH:/usr/local/go/bin
+          export GOROOT=/usr/local/go
           export GOPATH=$HOME/go
-          export PATH=$PATH:$GOPATH/bin
+          export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
         marker: "# {mark} ANSIBLE MANAGED BLOCK - GOLANG"
       tags: configure_golang
 
