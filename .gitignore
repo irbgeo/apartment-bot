@@ -14,11 +14,6 @@ client-test/
 # Debug files
 *__debug_*
 
-# Python
-*.pyc
-__pycache__/
-.venv/
-
 # Ansible
 *.retry
 deploy/ansible/inventory/server
