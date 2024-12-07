@@ -1,3 +1,4 @@
+.vscode/
 # Secret and environment files
 .env.*
 *secret*
