@@ -54,20 +54,6 @@
         state: absent
       tags: install_golang
 
-    - name: Create SSH directory
-      file:
-        path: /root/.ssh
-        state: directory
-        mode: "0700"
-      tags: setup_git
-
-    - name: Add GitHub to known_hosts
-      known_hosts:
-        name: github.com
-        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa github.com') }}"
-        state: present
-      tags: setup_git
-
     - name: Clean project directory
       file:
         path: "{{ project_path }}"
