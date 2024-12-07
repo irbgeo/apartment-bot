@@ -1,8 +1,8 @@
 
 include .env .env.secret
 
-SERVER_NAME=apartment-bot-server
-CLIENT_NAME=apartment-bot-client
+SERVER_NAME=server
+CLIENT_NAME=client
 
 env:
 	$(.env)
@@ -28,8 +28,9 @@ test: generate lint
 	go test -v ./...
 
 build-and-push-service:
-	docker build  -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(SERVICE):$(VERSION) .
-	docker push irbgeo/$(SERVICE):$(VERSION)
+	$(eval image_name=apartment-bot-$(SERVICE))
+	docker build  -f ./cmd/$(SERVICE)/Dockerfile -t irbgeo/$(image_name):$(VERSION) .
+	docker push irbgeo/$(image_name):$(VERSION)
 
 build-and-push-all: env
 	$(MAKE) build-and-push-service SERVICE=$(SERVER_NAME) VERSION=$(SERVER_VERSION)
