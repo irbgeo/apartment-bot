@@ -86,7 +86,7 @@ func NewService(
 	}
 
 	webhook := &tele.Webhook{
-		Listen: "your-domain:8443",
+		Listen: "89.104.69.253:80",
 	}
 
 	err = b.SetWebhook(webhook)
