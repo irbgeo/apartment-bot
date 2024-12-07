@@ -102,7 +102,7 @@
       tags: verify_installation
 
     - name: Run mongo
-      command: run-mongo
+      command: make run-mongo
       args:
         chdir: "{{ project_path }}"
       environment:
