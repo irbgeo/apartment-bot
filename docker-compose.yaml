@@ -14,12 +14,13 @@ services:
   server:
     image: irbgeo/apartment-bot-server:${SERVER_VERSION}
     container_name: server
-    ports:
-      - "9000:9000"
     environment:
       MONGO_URL: mongodb://apartment:${MONGO_PASSWORD}@mongodb:27017/
       AUTH_TOKEN: ${AUTH_TOKEN}
       MY_HOME_MAX_PAGE: 30
+    ports:
+      - "80:80"
+      - "9000:9000"
     depends_on:
       - mongodb
     healthcheck:

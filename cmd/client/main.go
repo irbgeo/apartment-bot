@@ -17,11 +17,10 @@ import (
 
 type configuration struct {
 	ServerURL                                string        `envconfig:"SERVER_URL" default:"localhost:9000"`
-	MessageURL                               string        `envconfig:"MESSAGE_URL" default:"localhost:9001"`
 	TelegramBotToken                         string        `envconfig:"TELEGRAM_BOT_TOKEN" required:"true"`
 	TelegramBotSendPeriod                    time.Duration `envconfig:"TELEGRAM_BOT_SEND_PERIOD" default:"10s"`
 	TelegramBotMaxCountSendMessagesPerPeriod int           `envconfig:"TELEGRAM_BOT_MAX_COUNT_SEND_MESSAGES_PER_PERIOD" default:"3"`
-	TelegramBotAdminUsername                 string        `envconfig:"TELEGRAM_BOT_ADMIN_USERNAME" default:"rent_apartment_georgia_bot_admin"`
+	TelegramBotAdminUsername                 string        `envconfig:"TELEGRAM_BOT_ADMIN_USERNAME" default:"geoirb"`
 	TelegramBotDisabledParameters            []string      `envconfig:"TELEGRAM_BOT_DISABLED_PARAMS" default:""`
 	FirstCities                              []string      `envconfig:"FIRST_CITIES" default:"Tbilisi,Batumi"`
 	AuthToken                                string        `envconfig:"AUTH_TOKEN" default:"LdBD1e0q"`
@@ -62,6 +61,7 @@ func main() {
 	botCfg := tgbot.StartConfig{
 		Token:               cfg.TelegramBotToken,
 		DisabledParameters:  cfg.TelegramBotDisabledParameters,
+		AdminUsername:       cfg.TelegramBotAdminUsername,
 		MaxPhotoCount:       cfg.TelegramBotMaxCountSendMessagesPerPeriod,
 		MessageSendInterval: cfg.TelegramBotSendPeriod,
 	}
