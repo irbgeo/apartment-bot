@@ -80,16 +80,10 @@ func NewService(
 ) (*service, error) {
 	b, err := tele.NewBot(tele.Settings{
 		Token: cfg.Token,
+		Poller: &tele.LongPoller{
+			Timeout: 1 * time.Second,
+		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	webhook := &tele.Webhook{
-		Listen: "your-domain:8443",
-	}
-
-	err = b.SetWebhook(webhook)
 	if err != nil {
 		return nil, err
 	}
