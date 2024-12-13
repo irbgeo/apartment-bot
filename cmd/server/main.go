@@ -22,8 +22,10 @@ import (
 type configuration struct {
 	Address                 string        `envconfig:"ADDRESS" default:":9000"`
 	HealthAddress           string        `envconfig:"HEALTH_ADDRESS" default:":9005"`
-	MongoURL                string        `envconfig:"MONGO_URL" default:"mongodb://apartment:apartment@localhost:27017/"`
-	MongoDB                 string        `envconfig:"MONGO_DB" default:"apartment"`
+	MongoAddress            string        `envconfig:"MONGO_ADDRESS" default:"localhost:27017"`
+	MongoUsername           string        `envconfig:"MONGO_USERNAME" default:"root"`
+	MongoPassword           string        `envconfig:"MONGO_PASSWORD" default:"password"`
+	MongoDatabase           string        `envconfig:"MONGO_DATABASE" default:"apartment"`
 	MaxFetchPages           int64         `envconfig:"MAX_FETCH_PAGES" default:"30"`
 	ApartmentUpdateInterval time.Duration `envconfig:"APARTMENT_UPDATE_INTERVAL" default:"1m"`
 	ApartmentDayToLive      int64         `envconfig:"APARTMENT_DAY_TO_LIVE" default:"7"`
@@ -43,7 +45,13 @@ func main() {
 
 	slog.Info("configuration", "cfg", cfg)
 
-	stor, err := mongo.NewStorage(cfg.MongoURL, cfg.MongoDB)
+	mongoCfg := mongo.Config{
+		Address:  cfg.MongoAddress,
+		Username: cfg.MongoUsername,
+		Password: cfg.MongoPassword,
+		Database: cfg.MongoDatabase,
+	}
+	stor, err := mongo.NewStorage(mongoCfg)
 	if err != nil {
 		slog.Error("init mongo storage", "err", err)
 		os.Exit(1)
