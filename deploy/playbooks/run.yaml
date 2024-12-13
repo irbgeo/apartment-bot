@@ -4,6 +4,16 @@
   vars_files:
     - deploy/vars/secret.yaml
   tasks:
+    - name: Copy files to server
+      copy:
+        src: "{{ playbook_dir }}/../../{{ item.src }}"
+        dest: "{{ project_path }}/{{ item.src }}"
+        mode: "0644"
+      with_items:
+        - { src: "docker-compose.yaml" }
+        - { src: "Makefile" }
+      tags: copy_files
+
     - name: Run application
       command: make run
       args:

@@ -17,7 +17,7 @@ client-test/
 
 # Ansible
 *.retry
-deploy/ansible/inventory/server
+deploy/inventory/server
 
 # Data directories
 mongodb_data/
