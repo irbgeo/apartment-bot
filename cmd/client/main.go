@@ -32,7 +32,7 @@ func main() {
 
 	var cfg configuration
 	if err := envconfig.Process("", &cfg); err != nil {
-		slog.Error("read configuration", "err", err)
+		slog.Error("read `configuration", "err", err)
 		os.Exit(1)
 	}
 

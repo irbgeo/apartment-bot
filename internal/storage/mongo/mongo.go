@@ -2,38 +2,47 @@ package mongo
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
 	"log/slog"
+	"net/url"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const connectURILayout = "mongodb://%s:%s@%s"
+
 type mongoDB struct {
 	db *mongo.Database
 }
 
-func NewStorage(uri, dbName string) (*mongoDB, error) {
+func NewStorage(cfg Config) (*mongoDB, error) {
+	username := url.QueryEscape(cfg.Username)
+	password := url.QueryEscape(cfg.Password)
+
+	uri := fmt.Sprintf(connectURILayout, username, password, cfg.Address)
+
 	opts := options.Client().ApplyURI(uri)
+
+	// Skip TLS verification for local development
+	if strings.Contains(cfg.Address, "443") {
+		opts.SetTLSConfig(&tls.Config{InsecureSkipVerify: true}) // nolint: gosec
+	}
+
 	client, err := mongo.Connect(context.Background(), opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to mongodb: %w", err)
 	}
 
 	if err := client.Ping(context.Background(), nil); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ping mongodb: %w", err)
 	}
 
 	m := &mongoDB{
-		db: client.Database(dbName),
-	}
-
-	if err := m.filterCollectionSetting(); err != nil {
-		return nil, err
-	}
-
-	if err := m.apartmentCollectionSetting(); err != nil {
-		return nil, err
+		db: client.Database(cfg.Database),
 	}
 
 	return m, nil
