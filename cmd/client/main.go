@@ -23,7 +23,7 @@ type configuration struct {
 	TelegramBotAdminUsername                 string        `envconfig:"TELEGRAM_BOT_ADMIN_USERNAME" default:"geoirb"`
 	TelegramBotDisabledParameters            []string      `envconfig:"TELEGRAM_BOT_DISABLED_PARAMS" default:""`
 	FirstCities                              []string      `envconfig:"FIRST_CITIES" default:"Tbilisi,Batumi"`
-	AuthToken                                string        `envconfig:"AUTH_TOKEN" default:"LdBD1e0q"`
+	AuthToken                                string        `envconfig:"AUTH_TOKEN" require:"true"`
 	ClientTag                                int64         `envconfig:"CLIENT_TAG" default:"1"`
 }
 
