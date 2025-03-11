@@ -92,6 +92,18 @@
         remote_src: yes
       tags: install_golang
 
+    - name: Install Go tools
+      command: "{{ item }}"
+      environment:
+        GOPATH: "/root/go"
+        GOROOT: "/usr/local/go"
+        PATH: "/root/go/bin:/usr/local/go/bin:{{ ansible_env.PATH }}"
+      with_items:
+        - /usr/local/go/bin/go install -v golang.org/x/tools/gopls@latest
+        - /usr/local/go/bin/go install -v github.com/go-delve/delve/cmd/dlv@latest
+        - /usr/local/go/bin/go install -v honnef.co/go/tools/cmd/staticcheck@latest
+      tags: install_go_tools
+
     - name: Add Go paths to /root/.bashrc
       blockinfile:
         path: /root/.bashrc
